@@ -37,12 +37,15 @@ class SimulationConfig:
     weight_scale: float = 0.35
     external_input_scale: float = 1.2
     synaptic_decay: float = 1.0
+    max_nodes: int = 2_000
 
     def __post_init__(self) -> None:
         if self.dt <= 0.0:
             raise ValueError("dt must be positive")
         if self.synaptic_decay <= 0.0 or self.synaptic_decay > 1.0:
             raise ValueError("synaptic_decay must be in (0, 1]")
+        if self.max_nodes <= 0:
+            raise ValueError("max_nodes must be positive")
 
     @classmethod
     def from_mapping(cls, mapping: Mapping[str, Any] | None) -> "SimulationConfig":
@@ -130,10 +133,16 @@ class NeuralSimulation:
         self.graph = graph
         self.config = config or SimulationConfig()
         self.params = neuron_params or NeuronParams()
+        if graph.num_nodes > self.config.max_nodes:
+            raise ValueError(
+                f"refusing to simulate {graph.num_nodes} neurons (SimulationConfig.max_nodes="
+                f"{self.config.max_nodes}). The simulation keeps dense per-step activity arrays; "
+                "extract a smaller subgraph first, e.g. graph.subgraph(graph.top_nodes(500))."
+            )
         self._seed = self.config.seed if seed is None else seed
         self._rng = np.random.default_rng(self._seed)
         self._population = LIFPopulation(graph.num_nodes, self.params, seed=self._seed)
-        self._region_masks = graph.region_matrix()
+        self._region_indices = graph.region_indices()
         self.step_index = 0
 
     # ------------------------------------------------------------- lifecycle
@@ -162,8 +171,12 @@ class NeuralSimulation:
         return self._population.membrane
 
     @property
-    def weights(self) -> np.ndarray:
-        """Effective synaptic weights, i.e. the graph weights times ``weight_scale``."""
+    def weights(self) -> Any:
+        """Effective synaptic weights, i.e. the graph weights times ``weight_scale``.
+
+        Stays sparse when the graph is sparse, so a real connectome is never
+        densified just to be multiplied by an activity vector.
+        """
         return self.graph.weights * self.config.weight_scale
 
     # ------------------------------------------------------------------ step
@@ -239,13 +252,13 @@ class NeuralSimulation:
     def _aggregate_regions(self, activity: np.ndarray, spikes: np.ndarray) -> tuple[dict[str, float], dict[str, int]]:
         region_activity: dict[str, float] = {}
         region_spikes: dict[str, int] = {}
-        for region, mask in self._region_masks.items():
-            if not mask.any():
+        for region, indices in self._region_indices.items():
+            if indices.size == 0:
                 region_activity[region] = 0.0
                 region_spikes[region] = 0
                 continue
-            region_activity[region] = float(activity[mask].mean())
-            region_spikes[region] = int(np.count_nonzero(spikes[mask]))
+            region_activity[region] = float(activity[indices].mean())
+            region_spikes[region] = int(np.count_nonzero(spikes[indices]))
         return region_activity, region_spikes
 
     def _as_vector(self, value: Sequence[float] | np.ndarray | None, size: int, name: str) -> np.ndarray:

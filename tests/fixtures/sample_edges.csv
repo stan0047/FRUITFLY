@@ -1,0 +1,11 @@
+pre_id,post_id,synapse_count,pre_region,post_region,pre_type,post_type
+N001,N002,4,optic_lobe,central_brain,T1,T2
+N001,N003,2,optic_lobe,central_brain,T1,T4
+N002,N003,7,central_brain,central_brain,T2,T4
+N002,N004,1,central_brain,thoracic_ganglion,T2,T5
+N003,N004,3,central_brain,thoracic_ganglion,T4,T5
+N003,N005,5,central_brain,descending_pathway,T4,T7
+N004,N005,1,thoracic_ganglion,descending_pathway,T5,T7
+N005,N001,2,descending_pathway,optic_lobe,T7,T1
+N001,N001,9,optic_lobe,optic_lobe,T1,T1
+N002,N002,6,central_brain,central_brain,T2,T2

@@ -17,9 +17,9 @@ from flybrain.brain.neuron import LIFPopulation, NeuronParams
 from flybrain.brain.simulation import NeuralSimulation, SimulationConfig
 from flybrain.data.connectome import (
     Connectome,
+    ConnectomeError,
     DataSource,
-    available_sources,
-    is_source_available,
+    load_connectome,
     load_flywire_connectome,
     synthetic_connectome,
 )
@@ -44,12 +44,24 @@ def test_synthetic_connectome_is_flagged_non_biological() -> None:
     assert "SIMULATION INPUT" in connectome.warn_if_synthetic()
 
 
-def test_real_connectome_is_not_claimed_to_exist() -> None:
-    """The FlyWire loader must fail loudly rather than return a placeholder."""
-    assert is_source_available(DataSource.FLYWIRE) is False
-    assert "flywire" not in available_sources()
-    with pytest.raises(NotImplementedError):
-        load_flywire_connectome()
+def test_real_connectome_is_not_bundled_or_fetched() -> None:
+    """The project must never ship or download a FlyWire dataset."""
+    from pathlib import Path
+
+    import flybrain
+
+    package_root = Path(flybrain.__file__).resolve().parent
+    repository_root = package_root.parent.parent
+    data_root = repository_root / "data"
+    if data_root.is_dir():
+        for path in data_root.rglob("*"):
+            if path.is_file() and path.suffix.lower() in {".csv", ".parquet", ".h5", ".hdf5", ".zip", ".gz"}:
+                pytest.fail(f"unexpected data file committed: {path}")
+
+    with pytest.raises(ConnectomeError, match="never downloads"):
+        load_flywire_connectome("https://example.invalid/flywire.csv")
+    with pytest.raises(ConnectomeError, match="does not bundle or download"):
+        load_flywire_connectome("no_such_local_file.csv")
 
 
 def test_connectome_roundtrip(tmp_path) -> None:

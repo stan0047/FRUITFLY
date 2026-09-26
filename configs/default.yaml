@@ -14,12 +14,37 @@ paths:
 
 connectome:
   # "synthetic" = randomly generated graph used for development and tests.
-  # "flywire"   = a real published export; NOT integrated yet (see data/README.md).
+  # "flywire"   = a real, user-downloaded export; no URL is ever fetched for you.
   source: synthetic
   path: null
   # Columns expected in a processed connectome CSV (one row per synapse).
   required_columns: [pre, post, weight]
   optional_columns: [synapse_type, neurotransmitter, neuropil]
+
+  # Import policy for a user-provided file. See data/README.md.
+  import:
+    # 0 = unlimited. Set a budget when experimenting so a huge export can be
+    # loaded and inspected on a laptop or the Colab free tier.
+    max_nodes: 0
+    max_edges: 0
+    # "error" refuses to exceed the budget; "subsample" takes a reproducible subset
+    # and labels every statistic as describing a subset.
+    on_limit: error
+    keep_self_loops: false
+    aggregate_duplicates: true
+    min_synapse_count: null
+    require_known_nodes: true
+    drop_null_rows: false
+    # Rows per pandas chunk when reading. Bounds parse memory and lets the edge
+    # budget stop the read early.
+    chunksize: null
+    # False drops unmapped source columns, reducing peak memory on large files.
+    keep_extra_columns: true
+    # Set false when the weight column is a proxy rather than a measured quantity.
+    weight_is_biological: true
+    seed: 0
+    # Optional neuron metadata table, relative to the project root.
+    node_table: null
 
 vision:
   grayscale: true
@@ -49,6 +74,9 @@ brain:
     seed: 0
     weight_scale: 0.35
     external_input_scale: 1.2
+    # The simulation holds dense per-step activity arrays, so it refuses graphs
+    # larger than this. Extract a subgraph first.
+    max_nodes: 2000
 
 navigation:
   width: 7

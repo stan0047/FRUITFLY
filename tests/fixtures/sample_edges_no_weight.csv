@@ -1,0 +1,5 @@
+pre_id,post_id,pre_region,post_region
+N001,N002,optic_lobe,central_brain
+N001,N003,optic_lobe,central_brain
+N002,N003,central_brain,central_brain
+N003,N004,central_brain,thoracic_ganglion

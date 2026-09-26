@@ -90,8 +90,10 @@ important honesty constraint of the project.
 | --- | --- | --- |
 | Connectome topology (neuron identities, which neuron connects to which) | **Real published biological data** — once a real export is loaded | `flybrain.data.connectome` |
 | Neuron / synapse attributes as published | **Real biological data** (synapse counts, types, weights *if the source provides them*) | `flybrain.data.connectome` |
-| Region labels and neuropil grouping | **Real biological data** when taken from the source; otherwise author-assigned and flagged | `flybrain.data.connectome` |
-| The synthetic graph used in tests and the smoke test | **NOT biological.** Random graph, clearly labelled `source="synthetic"` | `flybrain.brain.graph.synthetic_brain_graph` |
+| Region labels and neuropil grouping | **Real biological data** when taken from the source; otherwise absent | `flybrain.data.normalize` |
+| An imported user file | **Real biological data**, but only once *you* declare it so via `Provenance` | `flybrain.data.importer` |
+| The synthetic graph used in tests and the smoke test | **NOT biological.** Random graph, labelled `source="synthetic"` | `flybrain.brain.graph.synthetic_brain_graph` |
+| The hand-made files in `tests/fixtures/` | **NOT biological.** Test data, labelled `TEST FIXTURE - NOT REAL BIOLOGICAL DATA` | `tests/fixtures` |
 | LIF membrane integration, spike times, firing rates | **Simulation.** A standard, generic, non-biological model chosen for convenience | `flybrain.brain.neuron` |
 | Region↔neuron mapping for the synthetic graph | **Simulation scaffolding.** Arbitrary round-robin assignment | `flybrain.brain.graph` |
 | Observation encoding, action set, reward function | **Simulation.** A toy gridworld invented for this project | `flybrain.navigation.environment` |
@@ -104,9 +106,14 @@ Hard rules for this project:
 2. Never hardcode invented numbers under a citation. Unknown → `TODO` + not loaded.
 3. Every artefact that mixes real topology with simulated dynamics must state
    both parts.
-4. When the real connectome lands, `connectome.source` becomes `"flywire"` (or
-   whichever source), `is_biological` becomes `True` for topology, and the README
-   status section is updated in the same commit.
+4. `is_biological` is **declared, never inferred**. A file named `flywire.csv` is
+   not biological data by name alone.
+5. `DataSource.TEST_FIXTURE` can never report `is_biological=True`, whatever a
+   caller passes.
+6. Any statistic computed from a budgeted subset is labelled `SUBSET`, including
+   when the file read stopped early.
+7. When the real connectome lands, the README status section and the dataset
+   name/version/citation must be updated in the same commit as the loader change.
 
 ---
 
@@ -132,9 +139,76 @@ Implemented now:
 * Tests for imports, graph construction, simulation, environment stepping, and
   the baseline model; plus a runnable `scripts/smoke_test.py`.
 
-Deliberately not implemented yet: real connectome download, biologically detailed
-neuron models, optic-flow processing, a learned FlyBrain circuit, PPO, the live
-dashboard, and any frontend.
+Deliberately not implemented yet: a bundled or downloaded connectome, a learned
+FlyBrain circuit, PPO, the live dashboard, and any frontend.
+
+---
+
+## 4b. Current status after Phase 2 (connectome ingestion)
+
+The project can now ingest a **real, user-provided connectome export** safely
+and reproducibly. It still does not contain one.
+
+```
+USER-PROVIDED FILE  (you download it; FlyBrain never does)
+        ↓
+schema inspection     flybrain.data.schema      no guessing; ambiguity is an error
+        ↓
+column mapping        flybrain.data.normalize   canonical source_id/target_id/weight
+        ↓
+validation            flybrain.data.validation  reports every removal; never silent
+        ↓
+normalized connectome flybrain.data.connectome  frame-backed, provenance attached
+        ↓
+BrainGraph            flybrain.brain.graph      scipy CSR, sparse by default
+        ↓
+provenance + report   flybrain.data.report      says where it came from, and its scope
+```
+
+```bash
+python scripts/inspect_connectome.py --input data/raw/my_export.csv
+python scripts/import_connectome.py  --input data/raw/my_export.csv --output data/processed/ \
+    --source-name flywire --dataset-name "<export>" --dataset-version "<version>" \
+    --source-url "<page>" --license "<licence>" --citation "<citation>"
+```
+
+Implemented in Phase 2:
+
+* **Schema inspection** for CSV, TSV, Parquet, JSON and JSON Lines. Reports file
+  type, row count, columns, dtypes, sample rows, and candidate roles. Role
+  inference is structural (entity + attribute), not substring matching, so
+  `pre_id` is a source endpoint while `pre_region` is a region attribute of the
+  source. When a role cannot be resolved it is reported as unresolved, with the
+  candidates, and the import stops.
+* **Canonical format** — `source_id`, `target_id`, `weight`, plus optional
+  `source_region`, `target_region`, `source_type`, `target_type` and
+  `weight_is_biological`. Unmapped source columns are preserved, not dropped.
+* **Validation** for duplicate edges, self-loops, missing ids, nulls, negative
+  and non-numeric weights, unknown nodes, and empty datasets. Every removed row
+  is counted and named. Policy is explicit and defaults are conservative.
+* **Budgets** — `max_nodes` and `max_edges`, either refusing (`on_limit: error`)
+  or taking a reproducible subset (`on_limit: subsample`). A subset is labelled
+  `SUBSET` in the report, including when the read itself stopped early.
+* **Sparse throughout.** `Connectome.sparse_matrix()` always returns CSR;
+  `weight_matrix()` and `to_networkx()` refuse above a size limit. Measured on a
+  2M-edge / 120k-neuron file: 16 MB CSR where dense would be 58 GB.
+* **Provenance** — `source_name`, `dataset_name`, `dataset_version`,
+  `source_url`, `license`, `citation`, `imported_at`, `original_filename`,
+  `biological_data`, `notes`. Missing fields stay `None` and are listed as
+  `Unverified`. Nothing is inferred from a filename.
+* **Dataset report** with node/edge counts, degree statistics, weight
+  statistics, region and neuron-type breakdowns, an explicit scope line, and a
+  provenance statement.
+* **A test fixture set** under `tests/fixtures/`, labelled
+  `TEST FIXTURE - NOT REAL BIOLOGICAL DATA` and imported as a source that is
+  structurally incapable of claiming biological status. The pipeline is fully
+  testable without any real file existing.
+
+Not implemented in Phase 2, by design: no RL, no visual circuit, no
+`FlyBrainNet`, no neuron-firing visualisation, no dashboard.
+
+Memory and Colab guidance: see `data/README.md` and
+`notebooks/connectome_ingestion_colab.ipynb`.
 
 ---
 
@@ -145,8 +219,14 @@ configs/default.yaml            all tunables; no hardcoded values in code
 
 src/flybrain/
   config.py                     YAML loading, dotted get/set, path resolution
-  data/connectome.py            I/O + provenance for biological data ONLY
-  brain/graph.py                graph container, synthetic generator
+  data/provenance.py            DataSource, Provenance, honesty labels
+  data/schema.py                schema inspection, role inference, ambiguity errors
+  data/normalize.py             canonical edge format, ColumnMapping
+  data/validation.py            validation, cleaning, node/edge budgets
+  data/importer.py              the pipeline
+  data/connectome.py            Connectome, I/O, sparse conversion
+  data/report.py                dataset report
+  brain/graph.py                BrainGraph (dense or sparse CSR)
   brain/neuron.py               LIF parameters, state, population
   brain/simulation.py           step function: input + weights -> spikes
   vision/preprocessing.py       frames -> model-ready arrays
@@ -166,6 +246,7 @@ The four separation rules:
    It cannot step or mutate the simulation.
 4. **Config everywhere.** `brain/`, `navigation/`, `models/`, `training/` all take
    their parameters from dataclasses that can be built from the YAML config.
+   `connectome.import` in `configs/default.yaml` holds the ingestion policy.
 
 Data flow (current, scaffold level):
 
@@ -211,21 +292,23 @@ Colab notebook workflow lives in `notebooks/README.md`.
 
 ## 7. Roadmap
 
-1. **Scaffold** — layout, config, interfaces, tests, smoke test. *(this commit)*
-2. **Real connectome ingestion** — stream a public export into `data/processed/`
-   as a tidy CSV; record source, licence, version, and citation.
-3. **Circuit extraction** — pick documented visual and heading pathways; build
+1. **Scaffold** — layout, config, interfaces, tests, smoke test. *(done)*
+2. **Real connectome ingestion** — inspect a user-provided file, validate,
+   normalise, report, sparse graph. *(done; no dataset bundled)*
+3. **First real import** — you download an export, it is imported with full
+   provenance, and the report is published as a baseline measurement.
+4. **Circuit extraction** — pick documented visual and heading pathways; build
    region-level and neuron-level subgraphs; define which weights are measured
    vs. initialised.
-4. **Neuromodelled simulation** — graded potentials, synaptic kinetics, spike
+5. **Neuromodelled simulation** — graded potentials, synaptic kinetics, spike
    propagation, sparse weights at connectome scale; validate on CPU at toy scale.
-5. **Learned FlyBrain circuit** — initialise from connectome topology, learn
+6. **Learned FlyBrain circuit** — initialise from connectome topology, learn
    dynamics, compare against `TinyBaselineNet` on equal parameter budgets.
-6. **PPO and curriculum** — robust long-horizon training; multiple seeds;
+7. **PPO and curriculum** — robust long-horizon training; multiple seeds;
    report mean ± std.
-7. **Live dashboard** — camera view left, glowing 3D brain right, neuron firing
+8. **Live dashboard** — camera view left, glowing 3D brain right, neuron firing
    timeline, region activity, selected-neuron panel, controls, statistics.
-8. **Publication-grade write-up** — ablations, honest limitations, reproducible
+9. **Publication-grade write-up** — ablations, honest limitations, reproducible
    seeds and configs.
 
 ---
@@ -236,12 +319,15 @@ Colab notebook workflow lives in `notebooks/README.md`.
 python -m venv .venv
 # Windows: .venv\Scripts\activate      Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e ".[parquet]"   # optional, only for Parquet inputs (pyarrow)
 
-python -m pytest -q            # tests
-python scripts/smoke_test.py   # end-to-end scaffold check, writes outputs/figures
+python -m pytest -q                      # 155 tests
+python scripts/smoke_test.py             # end-to-end scaffold check
+python scripts/inspect_connectome.py --input <your-file.csv>
+python scripts/import_connectome.py  --input <your-file.csv> --output data/processed/
 ```
 
-Or install the package itself in editable mode:
+Or install the package itself in editable mode with the dev extras:
 
 ```bash
 pip install -e ".[dev]"

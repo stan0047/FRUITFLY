@@ -43,6 +43,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
+# Parquet input support. Kept optional: pyarrow is a large wheel and CSV needs
+# nothing extra. FlyBrain reads no Parquet file unless asked to.
+parquet = ["pyarrow>=14"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

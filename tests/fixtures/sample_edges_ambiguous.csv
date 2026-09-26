@@ -1,0 +1,4 @@
+pre_syn,post_syn,weight,presynaptic_id,postsynaptic_id,root_id
+N001,N002,4,AA1,BB2,1001
+N001,N003,2,AA1,BB3,1001
+N002,N003,7,AA2,BB3,1002

@@ -1,0 +1,6 @@
+neuron_id,region,neuron_type
+N001,optic_lobe,T1
+N002,central_brain,T2
+N003,central_brain,T4
+N004,thoracic_ganglion,T5
+N005,descending_pathway,T7

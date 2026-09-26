@@ -1,0 +1,4 @@
+pre_id,post_id,synapse_count,pre_region
+N001,N002,4,optic_lobe
+N002,N003,not_a_number,central_brain
+N003,N004,1,central_brain
