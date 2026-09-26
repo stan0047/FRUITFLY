@@ -15,5 +15,9 @@ PyYAML>=6.0
 gymnasium>=0.29
 torch>=2.2
 
+# Required to read the real MCNS Feather files, and therefore required by
+# scripts/extract_mcns_motion.py and scripts/run_mcns_activity.py.
+pyarrow>=14
+
 # Development / testing
 pytest>=7.4
