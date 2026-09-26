@@ -33,6 +33,10 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Tooling artifacts
+.playwright-mcp/
+.mcp/
+
 # ---------------------------------------------------------------- FlyBrain ---
 # Large datasets: never commit raw or processed connectome files.
 # See data/README.md for how and where to obtain them locally.
