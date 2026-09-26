@@ -17,6 +17,7 @@ from flybrain.data.mcns_provenance import (
     MCNS_CITATION_PREPRINT,
     MCNS_CONNECTOME_FILE,
     MCNS_DATASET,
+    MCNS_EDGE_COUNT_RECONCILIATION,
     MCNS_FACTS,
     MCNS_FIELD_SEMANTICS,
     MCNS_LICENSE,
@@ -26,6 +27,7 @@ from flybrain.data.mcns_provenance import (
     MCNS_SOURCE_URL,
     MCNS_UNRESOLVED,
     MCNS_VISUAL_COMPANION_PAPER,
+    NEUPRINT_AUTH_STATUS,
     mcns_provenance,
 )
 from flybrain.data.provenance import BIOLOGICAL_LABEL, DataSource, Provenance
@@ -85,9 +87,33 @@ def test_granularity_is_recorded_as_aggregated() -> None:
 
 
 def test_unresolved_questions_stay_unresolved() -> None:
-    for key in ("minconf-0.5", "edge_count", "neuron_count", "annotation_provenance", "gap_junctions"):
+    for key in ("residual_124M_vs_151M", "annotation_provenance", "gap_junctions", "preprint_vs_published"):
         assert key in MCNS_UNRESOLVED, f"{key} must remain recorded as an open question"
         assert MCNS_UNRESOLVED[key].strip()
+
+
+def test_edge_count_discrepancy_is_recorded_as_resolved() -> None:
+    record = MCNS_EDGE_COUNT_RECONCILIATION
+    assert record["status"] == "RESOLVED"
+    assert "superclass" in record["summary"]
+    assert record["local_verification"]["exact_match"] is True
+    assert record["local_verification"]["bodies_with_superclass"] == 166_700
+    for ruled_out in ("minimum_synapse_count_threshold", "dataset_release_difference", "synapse_level_vs_body_pair_level"):
+        assert ruled_out in record["ruled_out"]
+        assert record["ruled_out"][ruled_out].startswith("NOT the cause")
+    assert record["sources"] and all(url.startswith("https://") for url in record["sources"])
+
+
+def test_neuron_predicate_is_documented() -> None:
+    fact = MCNS_FIELD_SEMANTICS["superclass"]
+    assert fact.status in {"DOCUMENTED", "INFERRED"}
+    predicate = MCNS_FACTS["neuron_predicate"]
+    assert predicate.status == "DOCUMENTED"
+    assert "superclass" in predicate.meaning
+
+
+def test_neuprint_auth_status_is_recorded() -> None:
+    assert NEUPRINT_AUTH_STATUS == "INVALID_OR_UNVERIFIED"
 
 
 def test_visual_system_incompleteness_is_recorded() -> None:

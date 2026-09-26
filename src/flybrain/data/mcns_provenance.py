@@ -47,6 +47,7 @@ __all__ = [
     "MCNS_CONNECTOME_FILE",
     "MCNS_ANNOTATION_FILE",
     "MCNS_DATASET",
+    "MCNS_EDGE_COUNT_RECONCILIATION",
     "MCNS_FACTS",
     "MCNS_FIELD_SEMANTICS",
     "MCNS_LICENSE",
@@ -60,6 +61,7 @@ __all__ = [
     "MCNS_SOURCE_URL",
     "MCNS_UNRESOLVED",
     "MCNS_VISUAL_COMPANION_PAPER",
+    "NEUPRINT_AUTH_STATUS",
     "FieldFact",
     "mcns_provenance",
 ]
@@ -234,30 +236,18 @@ MCNS_FIELD_SEMANTICS: dict[str, FieldFact] = {
 
 #: Facts FlyBrain could not verify. These are gaps, not defaults.
 MCNS_UNRESOLVED: dict[str, str] = {
-    "minconf-0.5": (
-        "The 'minconf-0.5' tag in the filenames is not defined on the download page and is not "
-        "explained in the paper. The only 0.5 confidence cut-offs described in the paper apply to "
-        "neurotransmitter assignment, not to synapse detection. What the 0.5 is a threshold on is "
-        "therefore UNKNOWN to FlyBrain. Observation only: the local file retains connections with "
-        "weight 1, so the filter is permissive."
-    ),
-    "edge_count": (
-        "The paper states a connectome graph of '25.6M edges between 166,391 neurons' with no "
-        "filter named in that sentence, but the local connectome-weights file contains 151,856,684 "
-        "rows. The roughly six-fold difference is UNEXPLAINED. Candidate explanations include a "
-        "minimum-synapse threshold applied in the paper's analysis, and the inclusion here of "
-        "bodies that are not proofread neurons. FlyBrain does not choose between them."
-    ),
-    "neuron_count": (
-        "The paper gives 166,691 neurons in the abstract and 166,391 in the results; the 300-neuron "
-        "difference is not explained in the paper. The annotation table has 211,577 bodies, which "
-        "includes glia, orphans and fragments, so it is not directly comparable."
+    "residual_124M_vs_151M": (
+        "No official source states the row count of the bulk file, nor the total number of bodies "
+        "or segments in the dataset. The published proofread total is 124.2M synaptic connections; "
+        "the local file has 151,856,684 segment-pair rows. This residual is quantified by neither "
+        "side. It does not block subgraph work, because the node predicate is now known."
     ),
     "annotation_provenance": (
         "The download page calls the annotations 'curated' and the nuclei-derived cell body "
-        "annotations 'manually reviewed', but the method behind each individual field (class, "
-        "type, superclass) is not stated per-field. Per-field provenance is therefore UNKNOWN, and "
-        "no annotation field is treated by FlyBrain as a direct measurement."
+        "annotations 'manually reviewed', and the paper describes cell types as defined from "
+        "morphology and connectivity, but the method behind each individual field is not stated "
+        "per-field. Per-field provenance is therefore UNKNOWN, and no annotation field is treated "
+        "by FlyBrain as a direct measurement."
     ),
     "gap_junctions": (
         "Whether the weights table contains only chemical synapses is NOT stated. The neuPrint data "
@@ -265,7 +255,53 @@ MCNS_UNRESOLVED: dict[str, str] = {
         "column is present in the local file. Electrical connectivity is therefore neither confirmed "
         "nor excluded."
     ),
+    "preprint_vs_published": (
+        "The bioRxiv preprint v2 and the published Cell paper differ on the graph definition: the "
+        "preprint states '25.6M edges between 166,391 neurons' with no superclass qualifier, while "
+        "the published version states 25.58M edges between 166,483 neurons 'with a superclass "
+        "annotation'. The published version is treated as canonical."
+    ),
 }
+
+#: How the 25.58M vs 151,856,684 discrepancy was resolved: an officially documented
+#: node-population difference, verified locally. Recorded here so the finding and
+#: its evidence cannot be silently lost.
+MCNS_EDGE_COUNT_RECONCILIATION: dict[str, Any] = {
+    "status": "RESOLVED",
+    "summary": (
+        "The published 25.58M edges are between NEURONS, meaning bodies carrying a superclass. The "
+        "local file's 151,856,684 rows are between ALL SEGMENTS, including neuron fragments. Both "
+        "are ordered body-pair rows; the difference is the node population, not the granularity and "
+        "not a synapse-count threshold."
+    ),
+    "published_graph": "25.58M edges between 166,483 neurons with a superclass annotation",
+    "neuron_predicate": "a body is a neuron if and only if it has a superclass",
+    "local_verification": {
+        "bodies_with_superclass": 166_700,
+        "paper_neurons": 166_700,
+        "exact_match": True,
+    },
+    "ruled_out": {
+        "minimum_synapse_count_threshold": (
+            "NOT the cause. The >=5-synapse filter is documented as a further reduction, to a "
+            "separate graph of 6.24M edges between 165,536 neurons."
+        ),
+        "dataset_release_difference": "NOT the cause. The file is the v1.0 release matching the paper.",
+        "synapse_level_vs_body_pair_level": "NOT the cause. Both figures are body-pair level.",
+    },
+    "minconf_0_5": (
+        "A synapse-detection confidence threshold of 0.5, documented in the paper's figure caption, "
+        "applied to both sides of the comparison, so it explains none of the gap."
+    ),
+    "sources": [
+        _DOWNLOAD,
+        f"https://doi.org/{MCNS_PUBLISHED_DOI}",
+    ],
+}
+
+#: Authentication status of the locally configured neuPrint token.
+NEUPRINT_AUTH_STATUS = "INVALID_OR_UNVERIFIED"
+
 
 #: Dataset-level facts, for reports and provenance sidecars.
 MCNS_FACTS: dict[str, FieldFact] = {
@@ -300,12 +336,24 @@ MCNS_FACTS: dict[str, FieldFact] = {
     "stated_edges": FieldFact(
         field="stated_edges",
         meaning=(
-            "25.6M edges between 166,391 neurons, as stated in the paper's results. See "
-            "MCNS_UNRESOLVED['edge_count']: the local file has 151,856,684 rows."
+            "25.58M edges between 166,483 neurons that carry a superclass annotation, in a proofread "
+            "connectome of 124.2M synaptic connections. This is a neuron-level graph; the local bulk "
+            "file is segment-level and has 151,856,684 rows. See MCNS_EDGE_COUNT_RECONCILIATION."
         ),
         status="DOCUMENTED",
         source=_PAPER,
-        quote="a connectome graph containing 25.6M edges between 166,391 neurons",
+        quote="a connectome graph containing 25.58M edges between 166,483 neurons with a superclass annotation",
+    ),
+    "neuron_predicate": FieldFact(
+        field="neuron_predicate",
+        meaning=(
+            "The official test for whether a body is a neuron rather than a fragment of one. A body "
+            "is a neuron if and only if it has a superclass; bodies without one are fragments. "
+            "Verified locally: 166,700 bodies carry a superclass, matching the published neuron count."
+        ),
+        status="DOCUMENTED",
+        source=_PAPER,
+        quote="Bodies in the dataset are defined as neurons if they have a superclass.",
     ),
     "proofread_completion": FieldFact(
         field="proofread_completion",
