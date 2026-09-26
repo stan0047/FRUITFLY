@@ -1,0 +1,58 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging / build artefacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Editors
+.idea/
+.vscode/
+
+# ---------------------------------------------------------------- FlyBrain ---
+# Large datasets: never commit raw or processed connectome files.
+# See data/README.md for how and where to obtain them locally.
+/data/raw/*
+!/data/raw/.gitkeep
+/data/processed/*
+!/data/processed/.gitkeep
+
+# Generated artefacts
+/outputs/
+/wandb/
+*.log
+
+# Model checkpoints and training state
+*.pt
+*.pth
+*.ckpt
+checkpoints/
+/notebooks/**/checkpoints/
+
+# Large media produced by the visualisation code
+*.mp4
+*.gif

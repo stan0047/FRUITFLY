@@ -1,0 +1,19 @@
+# FlyBrain — initial development dependencies.
+# All packages are open source and free to use; no paid or proprietary services.
+# CPU-only by default: install torch from the PyTorch CPU index to avoid
+# pulling CUDA runtimes on machines without an NVIDIA GPU.
+#
+#   pip install -r requirements.txt
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch
+
+numpy>=1.26
+scipy>=1.11
+pandas>=2.1
+networkx>=3.2
+matplotlib>=3.8
+PyYAML>=6.0
+gymnasium>=0.29
+torch>=2.2
+
+# Development / testing
+pytest>=7.4

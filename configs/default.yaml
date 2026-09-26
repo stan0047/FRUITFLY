@@ -1,0 +1,89 @@
+project:
+  name: flybrain
+  description: Bio-inspired vision and navigation scaffold
+  seed: 0
+
+# All paths are relative to the repository root (the directory containing
+# pyproject.toml). Absolute paths are never hardcoded in the source.
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  outputs: outputs
+  checkpoints: outputs/checkpoints
+  figures: outputs/figures
+
+connectome:
+  # "synthetic" = randomly generated graph used for development and tests.
+  # "flywire"   = a real published export; NOT integrated yet (see data/README.md).
+  source: synthetic
+  path: null
+  # Columns expected in a processed connectome CSV (one row per synapse).
+  required_columns: [pre, post, weight]
+  optional_columns: [synapse_type, neurotransmitter, neuropil]
+
+vision:
+  grayscale: true
+  width: 32
+  height: 32
+  crop: null
+  normalize: true
+  frame_stack: 1
+  use_motion_channel: false
+
+brain:
+  graph:
+    num_neurons: 64
+    connectivity: 0.15
+    seed: 0
+    # Arbitrary labels for the synthetic graph only. NOT neuropil names.
+    regions: [visual_system, central_brain, descending_pathway]
+  neuron:
+    tau_membrane: 0.02
+    v_threshold: 1.0
+    v_reset: 0.0
+    v_rest: 0.0
+    tau_synapse: 0.005
+    refractory_periods: 2
+  simulation:
+    dt: 0.001
+    seed: 0
+    weight_scale: 0.35
+    external_input_scale: 1.2
+
+navigation:
+  width: 7
+  height: 7
+  num_obstacles: 4
+  max_steps: 100
+  randomize_layout: true
+  initial_heading: north
+  actions: [LEFT, FORWARD, RIGHT]
+  reward:
+    goal: 1.0
+    step: -0.01
+    collision: -0.1
+
+model:
+  baseline:
+    hidden_sizes: [64, 64]
+    activation: relu
+    device: cpu
+
+training:
+  # TODO: only REINFORCE-with-baseline exists; PPO is a roadmap item.
+  algorithm: reinforce
+  episodes: 20
+  total_timesteps: 2000
+  learning_rate: 0.001
+  gamma: 0.99
+  grad_clip: 1.0
+  log_interval: 1
+  device: cpu
+  seed: 0
+  checkpoint_dir: outputs/checkpoints
+
+visualization:
+  max_history: 500
+  timeline_window: 200
+  dpi: 120
+  figure_size: [10, 6]
