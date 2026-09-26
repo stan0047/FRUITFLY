@@ -39,6 +39,15 @@ from flybrain.data.importer import (
     import_connectome,
     iter_batches,
 )
+from flybrain.data.mcns_provenance import (
+    MCNS_CITATION,
+    MCNS_DATASET,
+    MCNS_LICENSE,
+    MCNS_SOURCE,
+    MCNS_SOURCE_URL,
+    MCNS_UNRESOLVED,
+    mcns_provenance,
+)
 from flybrain.data.normalize import (
     CANONICAL_EDGE_COLUMNS,
     CANONICAL_NODE_COLUMNS,
@@ -77,6 +86,12 @@ __all__ = [
     "BIOLOGICAL_LABEL",
     "CANONICAL_EDGE_COLUMNS",
     "CANONICAL_NODE_COLUMNS",
+    "MCNS_CITATION",
+    "MCNS_DATASET",
+    "MCNS_LICENSE",
+    "MCNS_SOURCE",
+    "MCNS_SOURCE_URL",
+    "MCNS_UNRESOLVED",
     "Connectome",
     "ConnectomeEdge",
     "ConnectomeError",
@@ -107,6 +122,7 @@ __all__ = [
     "iter_batches",
     "load_connectome",
     "load_flywire_connectome",
+    "mcns_provenance",
     "normalize_edges",
     "normalize_node_table",
     "render_connectome_report",
