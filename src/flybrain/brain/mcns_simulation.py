@@ -220,6 +220,8 @@ def run_simulation(
     synapse_scale: float = 0.25,
     coupling: str = "linear",
     trace_steps: int = 0,
+    propagation: Any | None = None,
+    record_input: bool = True,
 ) -> SimulationResult:
     """Run ``n_steps`` of sparse LIF dynamics over ``circuit``.
 
@@ -232,6 +234,16 @@ def run_simulation(
     because it sits in the sparse, propagating regime. It is a choice, not a
     calibration, and the model's output is very sensitive to it: at 0.05 nothing
     propagates past the input layer at all. See ``docs/MCNS_ACTIVITY_MODEL.md``.
+
+    ``propagation`` may be a prebuilt target-by-source CSR from
+    :meth:`~flybrain.brain.mcns_circuit.MCNSCircuit.propagation_matrix`. It is
+    built here when omitted. Passing it in lets a caller that runs many trials at
+    the same coupling gain build the matrix once instead of once per trial; the
+    dynamics are identical either way.
+
+    ``record_input=False`` skips the ``(n_steps, n_neurons)`` injected-current
+    log. It is pure instrumentation, it costs a full extra pass of memory per
+    run, and a benchmark that only reads spikes does not need it.
     """
     if n_steps <= 0:
         raise ValueError("n_steps must be positive")
@@ -243,7 +255,8 @@ def run_simulation(
     neuron_params = params or NeuronParams()
     # Target-by-source orientation, so `propagation @ spikes` is the drive each
     # neuron receives. See MCNSCircuit.propagation_matrix for why this matters.
-    propagation = circuit.propagation_matrix(synapse_scale=synapse_scale, coupling=coupling)
+    if propagation is None:
+        propagation = circuit.propagation_matrix(synapse_scale=synapse_scale, coupling=coupling)
     n = circuit.num_neurons
     trace_steps = max(0, min(int(trace_steps), n_steps))
 
@@ -254,9 +267,15 @@ def run_simulation(
     times = np.arange(n_steps, dtype=np.float64) * dt
     spike_log = np.zeros((n_steps, n), dtype=bool)
     membrane_log = np.zeros((trace_steps, n), dtype=np.float32) if trace_steps else np.zeros((0, n), np.float32)
-    input_log = np.zeros((n_steps, n), dtype=np.float32)
+    input_log = np.zeros((n_steps, n), dtype=np.float32) if record_input else np.zeros((0, n), np.float32)
 
-    condition = stimulus if isinstance(stimulus, Stimulus) else Stimulus(str(stimulus))
+    # The label is passed through to the encoder, which owns validation. This
+    # simulator is deliberately not coupled to any one stimulus vocabulary: the
+    # Phase 4A encoder uses Stimulus, the Phase 4B benchmark uses its own
+    # five-way set, and neither should require changes here. `getattr` rather
+    # than isinstance, because both are str enums and str() on a str enum gives
+    # "EnumName.MEMBER" rather than the value.
+    condition = str(getattr(stimulus, "value", stimulus))
     generator = np.random.default_rng(getattr(encoder, "seed", 0))
 
     started = time.perf_counter()
@@ -275,7 +294,8 @@ def run_simulation(
 
         spikes_recent = fired.astype(np.float64)
         spike_log[step] = fired
-        input_log[step] = injected
+        if record_input:
+            input_log[step] = injected
         if trace_steps and step < trace_steps:
             membrane_log[step] = membrane
     elapsed = time.perf_counter() - started
@@ -285,7 +305,7 @@ def run_simulation(
         spikes=spike_log,
         membrane=membrane_log,
         input_current=input_log,
-        stimulus=condition.value,
+        stimulus=condition,
         circuit_mode=circuit.mode,
         config={
             "dt": dt,

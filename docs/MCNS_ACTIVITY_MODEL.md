@@ -101,7 +101,15 @@ The stimulus names carry no claim about the preferred direction of any neuron.
 ## Direction selectivity is not demonstrated
 
 T4a-d and T5a-d are direction-selective in the fly. This model does not
-reproduce that tuning.
+reproduce that tuning, and **Phase 4B established that it cannot**, for a reason
+worth stating separately from the rest of this document.
+
+The MCNS connectivity table carries exactly three columns: `body_pre`,
+`body_post`, `weight`. There is **no synaptic sign**. Every coupling this project
+derives from it is non-negative, so the network can sum and never subtract. A
+Reichardt-type motion detector is built from ON-minus-OFF subtraction between
+spatially offset channels, and cannot be constructed from unsigned weights. The
+right response to that is to change the question, not to tune harder.
 
 It does produce this:
 
@@ -111,12 +119,16 @@ It does produce this:
 | T5a-d total | 2,910 | 58,321 | 37,565 |
 
 It is tempting to read the left/right mirror between the T4 and T5 groups as a
-directional code. **It is not one.** The encoder biases the ON channel toward
-one hemisphere and the OFF channel toward the other, so a T4-favours-one-side /
-T5-favours-the-other split is a restatement of the asymmetry that was *put in*.
-Demonstrating direction selectivity would need recorded responses to a
-controlled stimulus sweep, or a model whose tuning emerges from the connectivity
-without the input already containing it. Neither exists here.
+directional code. **It is not one.** The encoder drives one hemisphere more than
+the other, so a T4-favours-one-side / T5-favours-the-other split is a restatement
+of the asymmetry that was *put in*.
+
+Phase 4B replaced that encoder with an energy-matched moving spot whose two
+directions differ only in the sign of the sweep velocity, so the ON/OFF balance is
+identical to floating point and the direction cue is the trajectory. See
+`docs/MCNS_MOTION_BENCHMARK.md` for the resulting design, its controls, the
+acceptance gate that decides whether a result may be interpreted at all, and the
+four-level claim ladder that keeps the result at level 3.
 
 ## Sensitivity: the result depends on an arbitrary gain
 
