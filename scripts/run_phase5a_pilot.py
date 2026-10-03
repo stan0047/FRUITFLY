@@ -67,6 +67,13 @@ from flybrain.benchmark.matched import (  # noqa: E402
     drive_matched_control,
     verify_drive_matching,
 )
+from flybrain.benchmark.liveness_gated import (  # noqa: E402
+    ATTEMPT_SEED_POLICY,
+    CONTROL_NAME,
+    MAX_ATTEMPTS,
+    STRUCTURAL_CONSTRAINTS,
+    select_liveness_gated_control,
+)
 from flybrain.benchmark.phase5a import (  # noqa: E402
     ARMS,
     DIRECTION_SELECTIVITY_OUT_OF_SCOPE,
@@ -573,7 +580,7 @@ def main(argv: list[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     cache = Path(args.cache) if args.cache else output_dir / "extraction_cache.npz"
     trials = int(args.trials or (5 if estimating else 20))
-    progress = Progress(total=4, enabled=not args.quiet)
+    progress = Progress(total=5, enabled=not args.quiet)
 
     print("=" * _W)
     print(f"MCNS Phase {PREDECLARED_PHASE} pilot  [{'variance estimation' if estimating else 'pilot'}]")
@@ -605,6 +612,10 @@ def main(argv: list[str] | None = None) -> int:
               f"synapses={circuit.total_synapse_count:,}")
 
     progress.stage("Verify the drive-matched control against the measured graph")
+    # This is the legacy DRIVE_MATCHED_CONTROL that build_arms constructed. It
+    # is verified and printed for continuity; the PRIMARY control used by G3,
+    # G4 and the paired margin is replaced below by the liveness-gated
+    # candidate, which reassigns this variable.
     matched_verification = verify_drive_matching(circuits[PRIMARY_ARM], circuits[PRIMARY_CONTROL])
     existing_verification = verify_degree_preservation(
         circuits[PRIMARY_ARM], circuits[SECONDARY_CONTROL]
@@ -619,6 +630,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"    {key:<38} {matched_verification[key]}")
     print()
     print(f"  {DRIVE_MATCHED_DISCLAIMER}")
+    print("    (legacy DRIVE_MATCHED_CONTROL built by build_arms above; the PRIMARY")
+    print("     control for G3/G4 and the paired margin is selected below from the")
+    print("     frozen liveness-gated candidate search.)")
     print()
     print(f"  SECONDARY control, retained and labelled drive-mismatched: {SHUFFLED_DISCLAIMER}")
     print(f"    topology_changed={existing_verification['topology_changed']}  "
@@ -653,10 +667,61 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  G1 input locality: drive profile variance fraction "
           f"{drive_g1['variance_fraction']:.4f}  profile {np.round(drive_g1['mean_drive_profile'], 1).tolist()}")
 
-    progress.stage("Simulate every arm and compute the lateral readout")
+    progress.stage("Select the liveness-gated structural control (G3 acceptance gate)")
     all_counts: dict[str, dict[tuple[str, int], np.ndarray]] = {}
     all_live: dict[str, dict[str, Any]] = {}
     conditions = sorted({PRIMARY_CONTRAST[0], PRIMARY_CONTRAST[1], STATIC_CONTRAST[1]})
+
+    # Primary control: the frozen liveness-gated structural null. The probe
+    # exposes ONLY the declared G3 liveness records (T4/T5 pooled
+    # zero-activity and saturation fractions, with per-condition details).
+    # It never returns a centroid, lateral profile, margin, G4/G5 outcome, or
+    # any other scientific quantity, and candidate selection never sees one.
+    def _liveness_probe(arm_label: str, circuit: MCNSCircuit) -> dict[str, Any]:
+        prop = (
+            propagation
+            if circuit is measured
+            else circuit.propagation_matrix(
+                synapse_scale=float(PREDECLARED["synapse_scale"]), coupling="linear"
+            )
+        )
+        _, live = _counts_for_trials(
+            circuit, circuit.cell_type_index(), prop, generator, conditions,
+            int(trials), int(args.n_steps), READOUT_GROUPS,
+        )
+        return live
+
+    control_selection = select_liveness_gated_control(measured, _liveness_probe)
+    if control_selection["status"] != "accepted":
+        blocked_payload = {
+            "phase": PREDECLARED_PHASE,
+            "stage": "liveness-gated control selection",
+            "status": "BLOCKED",
+            "reason": control_selection["reason"],
+            "control_selection": control_selection,
+            "note": (
+                "No candidate satisfied the frozen contract within 32 deterministic "
+                "attempts. The primary comparison is BLOCKED: thresholds are not "
+                "relaxed, seeds are not extended, G3 is not loosened, and the old "
+                "DRIVE_MATCHED_CONTROL is not substituted."
+            ),
+        }
+        (output_dir / "phase5a_pilot.json").write_text(
+            json.dumps(blocked_payload, indent=2, default=str), encoding="utf-8"
+        )
+        print()
+        print("  BLOCKED: no DRIVE_MATCHED_LIVENESS_GATED candidate qualified within 32 attempts.")
+        print(f"  Full diagnostics written to {output_dir / 'phase5a_pilot.json'}")
+        return 3
+    circuits[PRIMARY_CONTROL] = control_selection["control_circuit"]
+    matched_verification = verify_drive_matching(
+        circuits[PRIMARY_ARM], circuits[PRIMARY_CONTROL]
+    )
+    accepted = control_selection["accepted"]
+    print(f"  selected {CONTROL_NAME}: attempt_index={accepted['attempt_index']} "
+          f"candidate_seed={accepted['candidate_seed']} "
+          f"attempts_executed={len(control_selection['attempts'])}")
+    progress.stage("Simulate every arm and compute the lateral readout")
     for name, circuit in circuits.items():
         prop = (
             propagation if name == PRIMARY_ARM
@@ -850,6 +915,16 @@ def main(argv: list[str] | None = None) -> int:
                       for name, per_group in centroids.items()},
         "primary_margins": {control: stats for control, stats in paired.items()},
         "primary_control": PRIMARY_CONTROL,
+        "primary_control_implementation": CONTROL_NAME,
+        "control_selection": {
+            "control_name": CONTROL_NAME,
+            "structural_constraints": STRUCTURAL_CONSTRAINTS,
+            "max_attempts": MAX_ATTEMPTS,
+            "attempt_seed_policy": ATTEMPT_SEED_POLICY,
+            "accepted_attempt_index": accepted["attempt_index"],
+            "accepted_candidate_seed": accepted["candidate_seed"],
+            "n_attempts_executed": len(control_selection["attempts"]),
+        },
         "secondary_control": SECONDARY_CONTROL,
         "secondary_control_note": (
             "reported and labelled drive-mismatched; the Phase 4C audit measured its per-cell-type "

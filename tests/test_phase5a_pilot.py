@@ -98,6 +98,39 @@ def _load_script():
     return module
 
 
+def _stub_liveness_gated_selection(module) -> None:
+    """Intentionally stub the frozen candidate search in payload-plumbing tests.
+
+    These tests assert what the pilot EMITS (circuits, liveness, centroids,
+    matched-control verification, predeclaration), not that a candidate is
+    successfully discovered. They cannot discover one: the synthetic
+    4-body-per-type pathway fixture has measured T4 pooled zero-activity
+    fraction 1.0, so every candidate is correctly BLOCKED by the locked G3
+    contract (pooled zero-activity <= 0.25). G3 is therefore not loosened and
+    the fixture is not altered to manufacture a qualifying candidate.
+
+    The real search is covered unstubbed in tests/test_liveness_gated.py, and
+    the BLOCKED path with its 32 per-candidate diagnostics is covered in
+    tests/test_phase5a_integration.py.
+    """
+
+    def stub(measured, liveness_probe, **kwargs):
+        return {
+            "status": "accepted",
+            "control_circuit": drive_matched_control(measured, seed=0),
+            "accepted": {
+                "attempt_index": 0,
+                "candidate_seed": 0,
+                "structural_verification": {},
+                "target_randomization": {},
+                "liveness": {},
+            },
+            "attempts": [{"attempt_index": 0, "candidate_seed": 0}],
+        }
+
+    module.select_liveness_gated_control = stub
+
+
 def _write_pathway_fixtures(directory: Path) -> tuple[Path, Path]:
     """A tiny annotation + connectivity pair containing the real chains.
 
@@ -911,6 +944,7 @@ class TestScriptContract:
 
     def test_the_variance_stage_reports_sd_and_no_effect(self, tmp_path, pathway_data) -> None:
         module = _load_script()
+        _stub_liveness_gated_selection(module)
         code = module.main([
             "--variance-estimation", "--quiet", "--trials", "3", "--n-steps", "40",
             "--max-bodies-per-type", "4", "--scrambles", "5", "--permutations", "5",
@@ -932,6 +966,7 @@ class TestScriptContract:
     def test_the_pilot_runs_end_to_end_on_the_fixture(self, tmp_path, pathway_data) -> None:
         """The whole pipeline, on synthetic data, in seconds. No real-data run."""
         module = _load_script()
+        _stub_liveness_gated_selection(module)
         out = tmp_path / "pilot"
         code = module.main([
             "--sd", "0.1", "--delta", "0.2", "--trials", "4", "--n-steps", "40",
@@ -953,6 +988,7 @@ class TestScriptContract:
 
     def test_all_three_arms_share_one_neuron_set(self, tmp_path, pathway_data) -> None:
         module = _load_script()
+        _stub_liveness_gated_selection(module)
         out = tmp_path / "pilot2"
         module.main([
             "--sd", "0.1", "--delta", "0.2", "--trials", "3", "--n-steps", "40",
@@ -971,6 +1007,7 @@ class TestScriptContract:
 
     def test_the_matched_control_verification_is_in_the_payload(self, tmp_path, pathway_data) -> None:
         module = _load_script()
+        _stub_liveness_gated_selection(module)
         out = tmp_path / "pilot3"
         module.main([
             "--sd", "0.1", "--delta", "0.2", "--trials", "3", "--n-steps", "40",
@@ -990,6 +1027,7 @@ class TestScriptContract:
 
     def test_liveness_is_reported_per_arm_and_group(self, tmp_path, pathway_data) -> None:
         module = _load_script()
+        _stub_liveness_gated_selection(module)
         out = tmp_path / "pilot4"
         module.main([
             "--sd", "0.1", "--delta", "0.2", "--trials", "3", "--n-steps", "40",
@@ -1007,6 +1045,7 @@ class TestScriptContract:
 
     def test_no_artifact_claims_a_biological_discovery(self, tmp_path, pathway_data) -> None:
         module = _load_script()
+        _stub_liveness_gated_selection(module)
         out = tmp_path / "pilot5"
         module.main([
             "--sd", "0.1", "--delta", "0.2", "--trials", "3", "--n-steps", "40",
@@ -1027,6 +1066,7 @@ class TestScriptContract:
     def test_the_four_arms_run_with_unaveraged_counts(self, tmp_path, pathway_data) -> None:
         """Counts, not a 1/8-quantised fold accuracy: the readout's whole point."""
         module = _load_script()
+        _stub_liveness_gated_selection(module)
         out = tmp_path / "pilot6"
         module.main([
             "--sd", "0.1", "--delta", "0.2", "--trials", "3", "--n-steps", "40",
@@ -1050,6 +1090,7 @@ class TestScriptContract:
         exposed for G3.
         """
         module = _load_script()
+        _stub_liveness_gated_selection(module)
         out = tmp_path / "pilot7"
         module.main([
             "--sd", "0.1", "--delta", "0.2", "--trials", "3", "--n-steps", "40",
