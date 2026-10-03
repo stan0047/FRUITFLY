@@ -57,5 +57,8 @@ flybrain = ["py.typed"]
 minversion = "7.0"
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-ra"
+addopts = "-ra -m \"not expensive\""
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "expensive: tests that execute a substantial MCNS benchmark (Phase 4B/4C end-to-end runs); excluded from the default fast suite and run with -m expensive",
+]

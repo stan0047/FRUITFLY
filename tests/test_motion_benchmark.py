@@ -1208,12 +1208,14 @@ def _json(path: Path):
 
 
 class TestScript:
+    @pytest.mark.expensive
     def test_quick_mode_runs_end_to_end(self, tmp_path: Path, pathway_data) -> None:
         code, output = _run(tmp_path, pathway_data, "--permutations", "0")
         assert code == 0
         for name in ("benchmark_summary.json", "decoder_results.json", "activity.json"):
             assert (output / name).is_file(), name
 
+    @pytest.mark.expensive
     def test_all_three_circuits_are_compared(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
         summary = _json(output / "benchmark_summary.json")
@@ -1227,6 +1229,7 @@ class TestScript:
         }
         assert len(populations) == 1, "every condition must simulate the same neurons"
 
+    @pytest.mark.expensive
     def test_every_control_is_reported(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
         summary = _json(output / "benchmark_summary.json")
@@ -1234,6 +1237,7 @@ class TestScript:
                       "T4", "T5", "T4+T5"):
             assert group in summary["config"]["groups"], group
 
+    @pytest.mark.expensive
     def test_every_contrast_is_reported(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
         results = _json(output / "decoder_results.json")
@@ -1244,11 +1248,13 @@ class TestScript:
                     "LEFTWARD_vs_POLARITY_REVERSED",
                 }
 
+    @pytest.mark.expensive
     def test_the_coupling_sweep_covers_the_required_gains(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
         summary = _json(output / "benchmark_summary.json")
         assert {0.25, 0.5, 1.0, 2.0} <= set(summary["config"]["synapse_scales"])
 
+    @pytest.mark.expensive
     def test_liveness_is_reported_for_every_scale_and_condition(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
         activity = _json(output / "activity.json")
@@ -1260,6 +1266,7 @@ class TestScript:
                     assert "active" in entry
                     assert "mean_spikes_per_trial" in entry
 
+    @pytest.mark.expensive
     def test_the_gate_is_reported_and_decidable_with_a_null(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "20")
         summary = _json(output / "benchmark_summary.json")
@@ -1271,6 +1278,7 @@ class TestScript:
             for condition in scale_entry["per_condition"].values():
                 assert condition["verdict"] in {"pass", "fail", "undecidable"}
 
+    @pytest.mark.expensive
     def test_no_null_means_the_gate_is_undecidable_not_pass(self, tmp_path: Path, pathway_data) -> None:
         """A gate that was never tested must not be reported as a pass."""
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
@@ -1279,11 +1287,13 @@ class TestScript:
         for scale_entry in summary["acceptance_gate"]["per_scale"].values():
             assert scale_entry["status"] == "undecidable"
 
+    @pytest.mark.expensive
     def test_the_gate_features_are_exactly_equal(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
         summary = _json(output / "benchmark_summary.json")
         assert summary["acceptance_gate"]["gate_feature_max_spread"] == 0.0
 
+    @pytest.mark.expensive
     def test_no_payload_claims_direction_selectivity(self, tmp_path: Path, pathway_data) -> None:
         """The claim ladder must be present and must stop short of level 4."""
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
@@ -1305,6 +1315,7 @@ class TestScript:
             ):
                 assert forbidden not in text, f"{name} asserts {forbidden!r}"
 
+    @pytest.mark.expensive
     def test_measured_simulated_and_assumed_are_separated(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
         summary = _json(output / "benchmark_summary.json")
@@ -1313,6 +1324,7 @@ class TestScript:
         assert any("synapse_scale" in item for item in summary["assumed"])
         assert any("subset" in item for item in summary["assumed"])
 
+    @pytest.mark.expensive
     def test_identical_across_conditions_is_stated(self, tmp_path: Path, pathway_data) -> None:
         _, output = _run(tmp_path, pathway_data, "--permutations", "0")
         stated = _json(output / "benchmark_summary.json")["config"]["identical_across_conditions"]
@@ -1320,6 +1332,7 @@ class TestScript:
                      "noise realisation (common random numbers)", "synapse_scale"):
             assert item in stated, item
 
+    @pytest.mark.expensive
     def test_two_runs_produce_identical_json(self, tmp_path: Path, pathway_data) -> None:
         _, first = _run(tmp_path / "a", pathway_data, "--permutations", "0")
         _, second = _run(tmp_path / "b", pathway_data, "--permutations", "0")
@@ -1328,6 +1341,7 @@ class TestScript:
                 second / name
             ).read_text(encoding="utf-8"), f"{name} is not reproducible"
 
+    @pytest.mark.expensive
     def test_the_extraction_cache_is_written_then_reused(self, tmp_path: Path, pathway_data,
                                                          capsys) -> None:
         module = _load_script()
@@ -1628,15 +1642,18 @@ class TestPhase4CPreDeclaration:
 
 
 class TestPhase4CConfiguration:
+    @pytest.mark.expensive
     def test_the_run_used_exactly_one_gain_at_the_pre_declared_value(self, phase4c) -> None:
         assert phase4c["summary"]["config"]["synapse_scales"] == [PREDECLARED_SYNAPSE_SCALE]
         assert phase4c["phase4c"]["predeclared_synapse_scale"] == PREDECLARED_SYNAPSE_SCALE
 
+    @pytest.mark.expensive
     def test_the_run_used_twenty_trials(self, phase4c) -> None:
         assert phase4c["summary"]["config"]["trials_per_condition"] == PREDECLARED_TRIALS == 20
         assert phase4c["phase4c"]["n_trials"] == 20
         assert phase4c["phase4c"]["n_folds"] == 20
 
+    @pytest.mark.expensive
     def test_the_run_used_the_fixed_permutation_count(self, phase4c) -> None:
         assert phase4c["summary"]["config"]["permutations"] == PREDECLARED_PERMUTATIONS == 500
         block = phase4c["phase4c"]
@@ -1646,6 +1663,7 @@ class TestPhase4CConfiguration:
         for name, stats in block["statistics"].items():
             assert stats["n_permutations"] == 500, name
 
+    @pytest.mark.expensive
     def test_every_reported_null_actually_ran_five_hundred(self, phase4c) -> None:
         checked = 0
         for circuits in phase4c["results"]["0.25"]["subtype_lateral"][
@@ -1659,6 +1677,7 @@ class TestPhase4CConfiguration:
                 checked += 1
         assert checked >= 3 * len(("INPUT_INSTANT", "T4", "T5", "T4+T5"))
 
+    @pytest.mark.expensive
     def test_the_readout_is_subtype_lateral_with_reported_features(self, phase4c) -> None:
         block = phase4c["phase4c"]
         assert block["primary_comparison"]["readout"] == "subtype_lateral"
@@ -1669,6 +1688,7 @@ class TestPhase4CConfiguration:
             assert 0 < census["n_nonzero_features"] <= 32, circuit_name
             assert census["n_nonzero_features"] + census["zero_features"] == 32
 
+    @pytest.mark.expensive
     def test_the_population_budget_and_stimulus_are_unchanged(self, phase4c) -> None:
         config = phase4c["summary"]["config"]
         assert config["max_bodies_per_type"] == PREDECLARED_MAX_BODIES_PER_TYPE
@@ -1681,6 +1701,7 @@ class TestPhase4CConfiguration:
 
 
 class TestPhase4CTrialProtocol:
+    @pytest.mark.expensive
     def test_leave_one_trial_out_gives_exactly_twenty_folds(self, phase4c) -> None:
         for circuit_name in REPLICATION_CIRCUITS:
             entry = _primary(phase4c, circuit_name)
@@ -1689,6 +1710,7 @@ class TestPhase4CTrialProtocol:
             assert entry["n_folds"] == PREDECLARED_TRIALS == 20
             assert len(entry["fold_accuracies"]) == 20
 
+    @pytest.mark.expensive
     def test_the_sample_count_is_asserted_not_assumed(self, phase4c) -> None:
         for circuit_name in REPLICATION_CIRCUITS:
             entry = _primary(phase4c, circuit_name)
@@ -1734,6 +1756,7 @@ class TestPhase4CTrialProtocol:
             )
             assert int(design["test_counts"][fold]) == len(STIM) * bins
 
+    @pytest.mark.expensive
     def test_every_fold_holds_both_sweep_directions(self, phase4c) -> None:
         """A fold must never be single-class, or its accuracy is a constant prediction."""
         for circuit_name in REPLICATION_CIRCUITS:
@@ -1768,6 +1791,7 @@ class TestPhase4CTrialProtocol:
             for name, vector in noise.items():
                 assert np.allclose(vector, reference), name
 
+    @pytest.mark.expensive
     def test_the_gate_features_are_exactly_equal_in_the_phase4c_run(self, phase4c) -> None:
         gate = phase4c["phase4c"]["acceptance_gate"]
         assert gate["gate_feature_identical_across_conditions"] is True
@@ -1776,11 +1800,13 @@ class TestPhase4CTrialProtocol:
 
 
 class TestPhase4CDeterminism:
+    @pytest.mark.expensive
     def test_the_run_carries_a_content_fingerprint(self, phase4c) -> None:
         prints = phase4c["phase4c"]["determinism"]["fingerprint_by_circuit"]
         for circuit_name, value in prints.items():
             assert isinstance(value, str) and len(value) == 64, circuit_name
 
+    @pytest.mark.expensive
     def test_two_runs_of_the_declared_configuration_agree(self, pathway_data) -> None:
         """Same declaration, same numbers. Run twice through the estimate path.
 
@@ -1827,6 +1853,7 @@ class TestPhase4CDeterminism:
 
 
 class TestPhase4CLiveness:
+    @pytest.mark.expensive
     def test_every_liveness_field_is_reported_for_every_condition(self, phase4c) -> None:
         required = (
             "mean_spikes_per_trial", "median_spikes_per_trial", "min_spikes_per_trial",
@@ -1843,6 +1870,7 @@ class TestPhase4CLiveness:
                 assert live["median_spikes_per_trial"] <= live["max_spikes_per_trial"]
                 assert 0.0 <= live["fraction_zero_activity_trials"] <= 1.0
 
+    @pytest.mark.expensive
     def test_t4_and_t5_activity_are_reported_separately(self, phase4c) -> None:
         for circuit_name in REPLICATION_CIRCUITS:
             groups = phase4c["phase4c"]["liveness"][circuit_name]
@@ -1851,12 +1879,14 @@ class TestPhase4CLiveness:
                 assert groups[group]["n_trials"] == 2 * PREDECLARED_TRIALS
             assert groups["T4+T5"]["n_trials"] == 2 * PREDECLARED_TRIALS
 
+    @pytest.mark.expensive
     def test_the_nonzero_feature_count_is_reported(self, phase4c) -> None:
         census = phase4c["phase4c"]["feature_census"]
         for circuit_name in REPLICATION_CIRCUITS:
             assert "n_nonzero_features" in census[circuit_name]
             assert "n_features" in census[circuit_name]
 
+    @pytest.mark.expensive
     def test_every_condition_gets_an_informativeness_verdict(self, phase4c) -> None:
         verdicts = phase4c["phase4c"]["informativeness"]
         for circuit_name in REPLICATION_CIRCUITS:
@@ -1925,6 +1955,7 @@ class TestPhase4CLiveness:
 
 
 class TestPhase4CPrimaryComparison:
+    @pytest.mark.expensive
     def test_the_primary_quantity_is_recurrent_minus_shuffled(self, phase4c) -> None:
         block = phase4c["phase4c"]["primary_comparison"]
         assert block["quantity"] == "MCNS_RECURRENT accuracy - SHUFFLED_CONTROL accuracy"
@@ -1940,6 +1971,7 @@ class TestPhase4CPrimaryComparison:
         )
         assert block["recurrent_minus_shuffled_margin"] == pytest.approx(expected, abs=1e-12)
 
+    @pytest.mark.expensive
     def test_both_separation_ratios_are_reported(self, phase4c) -> None:
         block = phase4c["phase4c"]["primary_comparison"]
         for key in (
@@ -1953,6 +1985,7 @@ class TestPhase4CPrimaryComparison:
             ratio = phase4c["phase4c"]["statistics"][circuit_name]["separation_ratio"]
             assert np.isfinite(float(ratio)) and float(ratio) > 0
 
+    @pytest.mark.expensive
     def test_a_separation_ratio_null_is_reported_for_each_condition(self, phase4c) -> None:
         for circuit_name in REPLICATION_CIRCUITS:
             null = phase4c["phase4c"]["statistics"][circuit_name]["separation_ratio_null"]
@@ -1960,6 +1993,7 @@ class TestPhase4CPrimaryComparison:
             assert null["n_permutations"] == PREDECLARED_PERMUTATIONS
             assert np.isfinite(float(null["null_p95"]))
 
+    @pytest.mark.expensive
     def test_each_separation_ratio_is_judged_against_its_own_null(self, phase4c) -> None:
         verdicts = phase4c["phase4c"]["separation_ratio_verdicts"]
         for circuit_name in REPLICATION_CIRCUITS:
@@ -1972,6 +2006,7 @@ class TestPhase4CPrimaryComparison:
             else:
                 assert "NOT further apart" in entry["interpretation"]
 
+    @pytest.mark.expensive
     def test_the_replication_verdict_follows_its_stated_rule(self, phase4c) -> None:
         block = phase4c["phase4c"]["replication_verdict"]
         assert block["outcome"] in {"replicated", "not_reproduced", "uninformative", "undecidable"}
@@ -1991,6 +2026,7 @@ class TestPhase4CPrimaryComparison:
             low, high = margin["confidence_interval"]
             assert low <= 0.0 <= high, "not reproduced means the interval spans zero"
 
+    @pytest.mark.expensive
     def test_the_verdict_does_not_overreach(self, phase4c) -> None:
         block = phase4c["phase4c"]["replication_verdict"]
         assert "one comparison" in block["scope"].lower()
@@ -2010,6 +2046,7 @@ class TestPhase4CPrimaryComparison:
                 ), window
                 start = hit + 1
 
+    @pytest.mark.expensive
     def test_the_margin_carries_its_uncertainty(self, phase4c) -> None:
         margin = phase4c["phase4c"]["primary_comparison"]["margin_statistics"]
         assert margin["status"] == "ok"
@@ -2038,6 +2075,7 @@ class TestPhase4CPrimaryComparison:
         assert result["status"] == "incomparable_folds"
         assert "mean_test_accuracy" not in result
 
+    @pytest.mark.expensive
     def test_an_informative_null_result_is_not_called_an_effect_on_its_own(self, phase4c) -> None:
         margin = phase4c["phase4c"]["primary_comparison"]["margin_statistics"]
         # Whatever the outcome, the effect word is gated on the uncertainty.
@@ -2047,6 +2085,7 @@ class TestPhase4CPrimaryComparison:
         assert expected in statement, statement
         assert phase4c["phase4c"]["primary_comparison"]["no_winner_declared"] is True
 
+    @pytest.mark.expensive
     def test_no_condition_is_ranked(self, phase4c) -> None:
         text = json.dumps(phase4c["phase4c"]).lower()
         for forbidden in (
@@ -2061,6 +2100,7 @@ class TestPhase4CPrimaryComparison:
 
 
 class TestPhase4CControls:
+    @pytest.mark.expensive
     def test_both_relay_controls_are_reported_for_every_condition(self, phase4c) -> None:
         relay = phase4c["phase4c"]["relay_controls"]
         for control in ("INPUT_SPATIAL", "INPUT_TEMPORAL", "INPUT_INSTANT", "MAGNITUDE_ONLY"):
@@ -2068,6 +2108,7 @@ class TestPhase4CControls:
             for circuit_name in REPLICATION_CIRCUITS:
                 assert relay[control][circuit_name].get("status") == "ok", (control, circuit_name)
 
+    @pytest.mark.expensive
     def test_the_relay_controls_are_identical_across_the_circuit_conditions(self, phase4c) -> None:
         """The relay controls come from the drive, so they cannot depend on the circuit.
 
@@ -2088,11 +2129,13 @@ class TestPhase4CControls:
             }
             assert len(values) == 1, f"{control} differs across circuit conditions: {values}"
 
+    @pytest.mark.expensive
     def test_the_input_instant_gate_does_not_separate(self, phase4c) -> None:
         gate = phase4c["phase4c"]["relay_controls"]["INPUT_INSTANT"]
         for circuit_name, entry in gate.items():
             assert entry["mean_test_accuracy"] == pytest.approx(0.5), circuit_name
 
+    @pytest.mark.expensive
     def test_the_relay_purpose_is_stated(self, phase4c) -> None:
         purpose = phase4c["phase4c"]["relay_control_purpose"].lower()
         assert "before the mcns circuit" in purpose
@@ -2100,6 +2143,7 @@ class TestPhase4CControls:
 
 
 class TestPhase4CIdenticalConditions:
+    @pytest.mark.expensive
     def test_recurrent_and_shuffled_share_one_population(self, phase4c) -> None:
         identity = phase4c["phase4c"]["population_identity_across_conditions"]
         pairs = {f"{a}|{b}": v for a, b, v in [
@@ -2114,6 +2158,7 @@ class TestPhase4CIdenticalConditions:
         assert set(pairs) == set(identity)
         assert phase4c["phase4c"]["same_population_and_edge_subset"] is True
 
+    @pytest.mark.expensive
     def test_all_three_conditions_simulate_the_same_neurons(self, phase4c) -> None:
         circuits = phase4c["summary"]["circuits"]
         assert set(circuits) == set(REPLICATION_CIRCUITS)
@@ -2123,6 +2168,7 @@ class TestPhase4CIdenticalConditions:
         # replaces them. The neuron set does not differ.
         assert circuits["MCNS_RECURRENT"]["edges"] == circuits["SHUFFLED_CONTROL"]["edges"]
 
+    @pytest.mark.expensive
     def test_shuffled_preserves_the_degree_sequences(self, phase4c) -> None:
         verification = phase4c["summary"]["shuffled_control"]["verification"]
         for key in (
@@ -2145,6 +2191,7 @@ class TestPhase4CIdenticalConditions:
 
 
 class TestPhase4CClaims:
+    @pytest.mark.expensive
     def test_measured_simulated_assumed_and_unresolved_are_all_present(
         self, phase4c
     ) -> None:
@@ -2153,31 +2200,37 @@ class TestPhase4CClaims:
             assert claims[heading], heading
         assert phase4c["summary"]["unresolved"] == claims["UNRESOLVED"]
 
+    @pytest.mark.expensive
     def test_synapse_count_is_not_efficacy(self, phase4c) -> None:
         assumed = " ".join(phase4c["phase4c"]["claims"]["ASSUMED"]).lower()
         assert "not synaptic efficacy" in assumed
         assert "count of chemical synapses" in assumed
 
+    @pytest.mark.expensive
     def test_the_graph_has_no_synaptic_sign(self, phase4c) -> None:
         unresolved = " ".join(phase4c["phase4c"]["claims"]["UNRESOLVED"]).lower()
         assert "no synaptic sign" in unresolved
         assert "only sum" in unresolved
 
+    @pytest.mark.expensive
     def test_the_encoder_contains_the_directional_structure(self, phase4c) -> None:
         assumed = " ".join(phase4c["phase4c"]["claims"]["ASSUMED"]).lower()
         assert "encoder contains the" in assumed
         assert "externally specified" in assumed
 
+    @pytest.mark.expensive
     def test_t4t5_asymmetry_alone_is_not_evidence_of_mcns_computation(self, phase4c) -> None:
         unresolved = " ".join(phase4c["phase4c"]["claims"]["UNRESOLVED"]).lower()
         assert "t4/t5 asymmetry alone is not evidence of mcns computation" in unresolved
 
+    @pytest.mark.expensive
     def test_the_cannot_establish_statement_is_explicit(self, phase4c) -> None:
         text = phase4c["phase4c"]["claims"]["CANNOT_BE_ESTABLISHED"]
         assert "cannot establish direction selectivity" in text.lower()
         assert "no number in this report may be presented as biological" in text.lower()
         assert phase4c["summary"]["direction_selectivity_claim"] == text
 
+    @pytest.mark.expensive
     def test_no_artifact_claims_a_biological_discovery(self, phase4c) -> None:
         for name in ("benchmark_summary.json", "decoder_results.json",
                      "activity.json", "phase4c_report.json"):
@@ -2193,6 +2246,7 @@ class TestPhase4CClaims:
             ):
                 assert forbidden not in text, f"{name} asserts {forbidden!r}"
 
+    @pytest.mark.expensive
     def test_no_post_hoc_tuning_is_stated(self, phase4c) -> None:
         block = phase4c["phase4c"]["no_post_hoc_tuning"]
         assert "is NOT changed" in block["statement"]
@@ -2200,6 +2254,7 @@ class TestPhase4CClaims:
         for item in block["decl"]:
             assert isinstance(item, str) and item
 
+    @pytest.mark.expensive
     def test_the_run_is_declared_a_replication_not_a_new_model(self, phase4c) -> None:
         block = phase4c["phase4c"]
         assert "replication" in block["kind"].lower()
@@ -2310,6 +2365,7 @@ class TestPhase4CTimingProjection:
         assert projection["treat_as_a_lower_estimate"] is True
         assert "2.2x" in projection["lower_estimate_note"]
 
+    @pytest.mark.expensive
     def test_the_estimate_is_written_and_declares_what_it_reduced(self, tmp_path, pathway_data) -> None:
         module = _load_script()
         code = module.main(
@@ -2440,6 +2496,7 @@ class TestConstantFeatureReporting:
         assert "at least one fold" in result["constant_features_definition"]
 
 
+    @pytest.mark.expensive
     def test_the_power_limitation_is_stated_and_computed(self, phase4c) -> None:
         """A null must never be readable as a zero without the detectable effect size.
 
